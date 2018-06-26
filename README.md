@@ -584,6 +584,89 @@ public class CglibProxy implements MethodInterceptor {
 - `context`:环境角色，持有某一个策略类的引用，被客户端调用
 - `strategy`：抽象策略角色，通常是由一个借口或抽象类实现；此角色给出了所有的具体策略类所需的接口
 - `concrete strategy`: 具体策略角色，包装了抽象策略的具体实现（包装了相关算法或行为）
+####策略模式Code
+```java
+/**
+* 抽象策略角色
+* strategy
+*/
+public interface PayStrategyInterface {
+    public String pay();
+}
+
+/**
+* 具体策略角色
+* concrete strategy
+* 支付宝
+*/
+public class AliPayStrategy implements PayStrategyInterface{
+    @Override
+    public String pay() {
+        return "支付宝支付......";
+    }
+}
+
+/**
+* 具体策略角色
+* concrete strategy
+* 微信
+*/
+public class WeChatPayStrategy implements PayStrategyInterface {
+    @Override
+    public String pay() {
+        return "微信支付......";
+    }
+}
+
+/**
+* 具体策略角色
+* concrete strategy
+* 银联
+*/
+public class BankPayStrategy implements PayStrategyInterface {
+    @Override
+    public String pay() {
+        return "银联支付......";
+    }
+}
+
+/**
+* 策略的环境容器， 持有的是策略的引用
+* context
+*/
+public class PayContext {
+    private PayStrategyInterface payStrategyInterface;
+
+    public PayContext(PayStrategyInterface payStrategyInterface) {
+        this.payStrategyInterface = payStrategyInterface;
+    }
+
+    public void pay(){
+        System.out.println(payStrategyInterface.pay());
+    }
+}
+
+/**
+* 策略模式的测试
+*/
+public class StrategyTest {
+
+    @Test
+    public void payTest() {
+        PayStrategyInterface payStrategyInterface = new AliPayStrategy();
+        PayContext payContext = new PayContext(payStrategyInterface);
+        payContext.pay();
+
+        payStrategyInterface = new WeChatPayStrategy();
+        payContext = new PayContext(payStrategyInterface);
+        payContext.pay();
+
+        payStrategyInterface = new BankPayStrategy();
+        payContext = new PayContext(payStrategyInterface);
+        payContext.pay();
+    }
+}
+```
 ### 模板模式
 ### 委派模式
 ### 适配器模式
