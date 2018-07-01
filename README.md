@@ -669,6 +669,102 @@ public class StrategyTest {
 ```
 ### 模板模式
 ####模板模式的了解
+- 个人理解：就是某种方法的执行顺序已经固定下来， 但是没一步的具体实施没有固定，通过抽象
+类的模式来让子类自定义
+- 书面说法：定义一个操作中的算法的骨架，而将一些步骤延迟到子类中，`Template Method`使得子类可以不改变一个算法的结构即可重定义该算法的某些特定步骤
+- `Templdate Method`模式一般需要继承的，但是以`Spring`的`JdbcTempldate`为例，它是没有继承的；它将变化的东西抽出来作为一个参数传入了`JdbcTmepldate`
+的方法中,使用回调对象定义一个操作`JdbcTempldate`中变量的方法， 我们实现这个方法，把变化的东西集中到回调中，再转入`JdbcTemplate`,从而完成调用
+
+#### 模板方法模式实现
+##### 继承
+##### 不继承
+```java
+//抽象的方法模板类
+public abstract class BaseTemplate {
+    private boolean doAdd = true;
+
+    public void init() {
+        //把水煮沸
+        getHotWater();
+
+        //沸水冲泡
+        watering();
+
+        //导入杯子
+        toGlass();
+
+        if (doSomeThing()) {
+            //添加调料
+            addCOndiments();
+        }
+    }
+
+    public abstract void getHotWater();
+
+    public abstract void watering();
+
+    public abstract void toGlass();
+
+    public abstract void addCOndiments();
+
+    public boolean doSomeThing(){
+        return true;
+    }
+
+}
+
+
+//方法模板的具体实施
+public class CoffeTemplate extends BaseTemplate {
+    @Override
+    public void getHotWater() {
+        System.out.println("烧开热水");
+    }
+
+    @Override
+    public void watering() {
+        System.out.println("热水冲泡咖啡");
+    }
+
+    @Override
+    public void toGlass() {
+        System.out.println("咖啡导入杯子中");
+    }
+
+    @Override
+    public void addCOndiments() {
+        System.out.println("添加牛奶和糖");
+    }
+}
+
+//方法模板的具体实施， 放弃了最后一步
+public class TeaTemplate extends BaseTemplate {
+    @Override
+    public void getHotWater() {
+        System.out.println("获得热水");
+    }
+
+    @Override
+    public void watering() {
+        System.out.println("热水泡茶");
+    }
+
+    @Override
+    public void toGlass() {
+        System.out.println("把茶倒入杯子中");
+    }
+
+    @Override
+    public void addCOndiments() {
+        System.out.println("添加柠檬");
+    }
+
+    @Override
+    public boolean doSomeThing() {
+        return false;
+    }
+}
+```
 
 ### 委派模式
 ### 适配器模式
