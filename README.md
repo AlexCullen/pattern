@@ -676,8 +676,84 @@ public class StrategyTest {
 的方法中,使用回调对象定义一个操作`JdbcTempldate`中变量的方法， 我们实现这个方法，把变化的东西集中到回调中，再转入`JdbcTemplate`,从而完成调用
 
 #### 模板方法模式实现
-##### 继承
 ##### 不继承
+- 通过回调函数，把每一步能流程都进行封装一遍；通常来说，这类做法还得有一个具体的实现类，来做具体操作；
+以JdbcTemplate为例， 它还是已入了`mysql`、`oracle`等驱动来实现各类方法
+```java
+public class JdbcTemplate {
+    private DataSource dataSource;
+    public JdbcTemplate(DataSource dataSource){
+        this.dataSource = dataSource;
+    }
+
+    private Connection getConnection() throws  Exception{
+        return this.dataSource.getConnection();
+    }
+
+    private PreparedStatement createPreparedStatement(Connection conn, String sql) throws  Exception{
+        return  conn.prepareStatement(sql);
+    }
+
+
+    private ResultSet executeQuery(PreparedStatement pstmt, Object [] values) throws  Exception{
+        for (int i = 0; i <values.length; i ++){
+            pstmt.setObject(i,values[i]);
+        }
+        return  pstmt.executeQuery();
+    }
+
+    private void closeStatement(Statement stmt) throws  Exception{
+        stmt.close();
+    }
+
+    private void closeResultSet(ResultSet rs) throws  Exception{
+        rs.close();
+    }
+
+    private void closeConnection(Connection conn) throws  Exception{
+        //通常把它放到连接池回收
+    }
+
+
+
+    private List<?> parseResultSet(ResultSet rs, RowMapper rowMapper) throws  Exception{
+        List<Object> result = new ArrayList<Object>();
+        int rowNum = 1;
+        while (rs.next()){
+            result.add(rowMapper.mapRow(rs,rowNum ++));
+        }
+        return result;
+    }
+
+
+    public List<?> executeQuery(String sql,RowMapper<?> rowMapper,Object [] values){
+        try {
+
+            //1、获取连接
+            Connection conn = this.getConnection();
+            //2、创建语句集
+            PreparedStatement pstmt = this.createPreparedStatement(conn,sql);
+            //3、执行语句集，并且获得结果集
+            ResultSet rs = this.executeQuery(pstmt,values);
+            //4、解析语句集
+            List<?> result = this.parseResultSet(rs,rowMapper);
+
+            //5、关闭结果集
+            this.closeResultSet(rs);
+            //6、关闭语句集
+            this.closeStatement(pstmt);
+            //7、关闭连接
+            this.closeConnection(conn);
+
+            return result;
+        }catch (Exception e){
+            e.printStackTrace();
+            return null;
+        }
+    }
+}
+```
+##### 继承
 ```java
 //抽象的方法模板类
 public abstract class BaseTemplate {
@@ -767,6 +843,281 @@ public class TeaTemplate extends BaseTemplate {
 ```
 
 ### 委派模式
+- 这个模式不是23中模式当中的，是面向对象设计模式中常用的一种设计模式
+- 标准释义：类B和类A是两个没有任何关系的类，B和A具有一模一样的方法和属性，并且调用B中的方法、属性就是
+调用A中的方法和属性；B好像就是受A授权委托的中介，第三方不知道A的存在，也不会和A发生直接关系，通过B就
+可以直接使用A的功能；这样既能使用A的功能，有能保护A；
+- 听起来是不是很像代理模式呢；实际上代理模式说明了原类和代理类都是实现了相同的接口，又或者有继承关系；
+但是委派模式并不存在这种关系，它只是调用原类的方法；
+- 委托模式通常会和策略模式组合使用；通过策略模式决定使用哪个委托的类
+- 典型的就是SpringMvc的ServletDispatch
+
+```java
+public class Boss {
+    /**
+     * Boss 客户端  Leader 委派者 Target 被委派者
+     * 
+     * 委派者要持有 被委派者的引用
+     * 代理模式注重的是过程， 委派模式注重结果
+     * 策略模式注重可扩展性， 委派模式注重内部的灵活和复用
+     * 
+     * 委派的核心：分发、调度、派遣
+     * 委派模式：静态代理和策略模式的一种特殊组合
+     */
+    
+    public static void main(String[] args) {
+        new Leader().doSomeThing("加密");
+    }
+}
+
+public class Leader {
+    private Map<String, Target> map = new HashMap<>();
+    public Leader(){
+        map.put("加密", new TargetA());
+        map.put("解密", new TargetA());
+    }
+    public void doSomeThing(String command){
+        map.get(command).doSomeThing(command);
+    }
+}
+
+public interface Target {
+    public void doSomeThing(String command);
+}
+
+public class TargetA implements Target {
+    @Override
+    public void doSomeThing(String command) {
+        System.out.println("TargetA do " + command);
+    }
+}
+
+public class TargetB implements Target {
+    @Override
+    public void doSomeThing(String command) {
+        System.out.println("TargetB do " + command);
+    }
+}
+```
+
+- 模拟的是MVC的分发
+```java
+public class ServletDispatch {
+    private List<Handler> handlerMapping = new ArrayList<>();
+
+    public ServletDispatch(){
+        Class<?> memberAction = MemberAction.class;
+        try {
+            handlerMapping.add(new Handler().setController(memberAction.newInstance())
+                    .setMethod(memberAction.getMethod("getMemberById",new Class[]{String.class}))
+                    .setUrl("/web/getMember.json"));
+        }catch (Exception e){
+
+        }
+    }
+
+    public void doService(HttpServletRequest req, HttpServletResponse res){
+        doDispatch(req, res);
+    }
+    private void doDispatch(HttpServletRequest req, HttpServletResponse res){
+        String uri = req.getRequestURI();
+        Handler handler = null;
+        for(Handler h : handlerMapping){
+            if (h.getUrl().equals(uri)){
+                handler = h;
+                break;
+            }
+        }
+
+        try {
+            handler.getMethod().invoke(handler.getController(),req.getParameter("mid"));
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        } catch (InvocationTargetException e) {
+            e.printStackTrace();
+        }
+    }
+    class Handler{
+        private Object controller;
+        private Method method;
+        private String url;
+
+        public Object getController() {
+            return controller;
+        }
+
+        public Handler setController(Object controller) {
+            this.controller = controller;
+            return this;
+        }
+
+        public Method getMethod() {
+            return method;
+        }
+
+        public Handler setMethod(Method method) {
+            this.method = method;
+            return this;
+        }
+
+        public String getUrl() {
+            return url;
+        }
+
+        public Handler setUrl(String url) {
+            this.url = url;
+            return this;
+        }
+    }
+}
+
+```
 ### 适配器模式
+- 适配器模式通俗的来说就是：将不满足需求的类在修改它的前提，通过另外一个类转换它，让它能够满足要求
+- 适配器与被适配的有 `has-a`的关系
+- 适配器分为：类适配器、对象适配器、接口适配器
+- 参考网址：https://www.cnblogs.com/V1haoge/p/6479118.html
+####类适配器
+- 原理：通过继承来实现适配；
+- 接口A没有需要的功能， 接口B有满足需求的功能；不能改变接口A的前提；使用适配器P来进行中转适配；P要
+实现接口A，在继承B的实现类，那么就能在P的A方法中调用B的方法
+```java
+public interface Ps2{
+    void isPs2();
+}
+
+public interface USB{
+    void isUsb();
+}
+
+public class Usber implements USB{
+    public void isUsb(){
+        System.out.println("USB接口");
+    }
+}
+
+public class Adapter extends Usber implements Ps2{
+    public void isPs2(){
+        isUsb();
+    }
+}
+```
+####对象适配器
+- 通过组合来实现适配器功能
+- 接口A没有需要的功能， 接口B有满足需求的功能；不能改变接口A的前提；使用适配器P来进行中转适配；P要
+  实现接口A，在P中在定义一个B的变量；通过变量再调用方法
+```java
+public interface Ps2{
+    void isPs2();
+}
+
+public interface USB{
+    void isUsb();
+}
+
+public class Usber implements USB{
+    public void isUsb(){
+        System.out.println("USB接口");
+    }
+}
+
+public class Adapter implements Ps2{
+    private USB usb = new Usber();
+    public void isPs2(){
+        usb.isUsb();
+    }
+}
+
+```
+####接口适配器
+- 原理：通过抽象类来实现适配；
+- 场景：存在这样一个接口，该接口中定义了多个方法，但是实际应用上只要使用其中一个或几个方法；
+如果实现接口就要实现所有的方法；那么我们可以用一个抽象类实现接口；在通过继承抽象类重写所需的方法
+```java
+public interface A {
+    void a();
+    void b();
+    void c();
+    void d();
+    void e();
+    void f();
+}
+
+public abstract class Adapter implements A {
+    public void a(){}
+    public void b(){}
+    public void c(){}
+    public void d(){}
+    public void e(){}
+    public void f(){}
+}
+
+public class Ashili extends Adapter {
+    public void a(){
+        System.out.println("实现A方法被调用");
+    }
+    public void d(){
+        System.out.println("实现d方法被调用");
+    }
+}
+```
+
+####登录场景下的适配(类适配器)
+```java
+public class SiginService {
+
+    /**
+     * 注册方法
+     * @param username
+     * @param password
+     * @return
+     */
+    public ResultMsg regist(String username, String password){
+        return  new ResultMsg(200,"注册成功",new Member());
+    }
+
+
+    /**
+     * 登录的方法
+     * @param username
+     * @param password
+     * @return
+     */
+    public ResultMsg login(String username,String password){
+        System.out.println("账号密码登录");
+        return null;
+    }
+
+}
+
+public class SiginServiceThirdAdapter extends SiginService{
+    public ResultMsg loginForQQ(String openId) {
+        System.out.println("第三方QQ登录");
+        return login(openId, null);
+    }
+
+    public ResultMsg loginForWechat(String openId) {
+        System.out.println("第三方微信登录");
+        return login(openId, null);
+    }
+
+    public ResultMsg loginForRegist(String username, String password){
+        System.out.println("不用注册，就能登录");
+        super.regist(username,null);
+        return super.login(username,null);
+    }
+}
+```
+
+####适配器的场景应用
+> **类适配器和对象适配器的使用场景一致**
+>   1）想要使用一个已经存在的类，但是它不符合现有的接口规范，导致无法直接访问；创建一个适配器间接访问
+>   2）创建适配器来适配其他没有提供合适接口的类
+
+> **接口适配器**
+>   想使用某接口的某些方法，但是接口的方法太多；那么就使用一个抽象类来实现该接口，但是不对方法实现（置空）
+>   通过继承抽象类重写某些方法；这个抽象类就是适配器了
+
 ### 装饰器模式
+
 ### 观察者模式
